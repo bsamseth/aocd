@@ -1,0 +1,15 @@
+[package]
+name = "aocd"
+version = "0.1.0"
+edition = "2021"
+description = "Advent of Code Data - get puzzle input and submit answers from within your code"
+documentation = "https://docs.rs/aocd"
+homepage = "https://github.com/bsamseth/aocd"
+license = "MIT"
+
+[dependencies]
+anyhow = "1.0.66"
+regex = "1.7.0"
+reqwest = { version = "0.11.13", features = ["blocking"] }
+rusqlite = { version = "0.28.0", features = ["bundled"] }
+shellexpand = "3.0.0"
