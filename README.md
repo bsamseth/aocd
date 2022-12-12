@@ -1,5 +1,7 @@
 # Advent of Code Data
 
+[![crates.io](https://img.shields.io/crates/v/aocd)](https://crates.io/crates/aocd)
+
 Programaticly get your puzzle input and submit answers, in Rust.
 
 Might be useful for lazy Rustaceans and speed hackers.
