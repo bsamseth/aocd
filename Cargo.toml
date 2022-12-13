@@ -1,6 +1,6 @@
 [package]
 name = "aocd"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 description = "Advent of Code Data - get puzzle input and submit answers from within your code"
 documentation = "https://docs.rs/aocd"

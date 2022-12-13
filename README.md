@@ -28,3 +28,22 @@ fn main() {
     submit!(2, elves.iter().rev().take(3).sum::<u32>());
 }
 ```
+
+## Quickstart
+
+You need to provide your AoC session token in order for this crate to get your personal puzzle input and to be able to
+submit answers for you. This is a cookie which is set when you login to AoC. You can find it with your browser
+inspector. See [this issue](https://github.com/wimglenn/advent-of-code/issues/1) for a how-to.
+
+```bash
+mkdir -p ~/.config/aocd
+echo "your session cookie here" > ~/.config/aocd/token
+```
+
+Next, add the crate to your dependencies:
+```
+cargo add aocd
+```
+
+In your code, annotate your main function with `#[aocd(year, day)]`, and then use the macros `input!()` and
+`submit!(part, answer)` to get your puzzle input and submit anawers, respectively.
