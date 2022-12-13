@@ -138,6 +138,7 @@ impl Aocd {
     }
 
     fn cache_past_answers(&self) -> Result<()> {
+        println!("You appear to have answered this puzzle before, but aocd doesn't remember that.");
         println!(
             "Caching past answers for {} day {} by parsing the puzzle page.",
             self.year, self.day
@@ -146,8 +147,6 @@ impl Aocd {
         let response = self.client.get(&url).send()?.error_for_status()?;
         let response_html = response.text()?;
 
-        println!("Here is the response from AoC:");
-        println!("{}", response_html);
         let mut part1: Option<String> = None;
         let mut part2: Option<String> = None;
         let re = Regex::new(r#"Your puzzle answer was <code>(.*)</code>"#).unwrap();
