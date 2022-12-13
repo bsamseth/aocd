@@ -1,0 +1,13 @@
+[package]
+name = "aocd-proc"
+version = "0.2.0"
+edition = "2021"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+chrono = "0.4.23"
+proc-macro2 = "1.0.47"
+quote = "1.0.21"
+syn = { version = "1.0.105", features = ["full"] }

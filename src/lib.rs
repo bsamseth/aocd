@@ -1,4 +1,4 @@
 mod cache;
 mod client;
 
-pub use client::Aocd;
+pub use aocd_proc::{aocd, input, submit};
