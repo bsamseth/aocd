@@ -149,7 +149,7 @@ impl Aocd {
 
         let mut part1: Option<String> = None;
         let mut part2: Option<String> = None;
-        let re = Regex::new(r#"Your puzzle answer was <code>(.*)</code>"#).unwrap();
+        let re = Regex::new(r#"Your puzzle answer was <code>(.*?)</code>"#).unwrap();
         for capture in re.captures_iter(&response_html) {
             if part1.is_none() {
                 part1 = Some(capture[1].to_string());
