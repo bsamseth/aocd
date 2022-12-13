@@ -48,7 +48,7 @@ impl Parse for SubmitArgs {
 /// This sets up your main function so that you can use the `aocd::input!` and `aocd::submit!` macros.
 ///
 /// # Example
-/// ```
+/// ```ignore
 /// use aocd::*;
 ///
 /// #[aocd(2015, 1)]

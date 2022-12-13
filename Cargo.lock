@@ -39,7 +39,7 @@ checksum = "216261ddc8289130e551ddcd5ce8a064710c0d064a4d2895c67151c92b5443f6"
 
 [[package]]
 name = "aocd"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "anyhow",
  "aocd-proc",
@@ -51,7 +51,7 @@ dependencies = [
 
 [[package]]
 name = "aocd-proc"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "chrono",
  "proc-macro2",
