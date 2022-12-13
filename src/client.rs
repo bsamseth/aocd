@@ -115,13 +115,16 @@ impl Aocd {
         }
         let response = response.expect("Failed to parse response from AoC when submitting answer.");
 
-        let mut correct = false;
         if response.contains("That's the right answer!") {
             println!("Part {} correctly solved with answer: {}", part, answer);
-            correct = true;
-        } else if response.contains("That's not the right answer")
-            || response.contains("You gave an answer too recently")
-        {
+            self.cache
+                .cache_answer_response(part, answer, response, true);
+        } else if response.contains("That's not the right answer") {
+            println!("{}", response);
+            self.cache
+                .cache_answer_response(part, answer, response, false);
+        } else if response.contains("You gave an answer too recently") {
+            // Don't cache this response.
             println!("{}", response);
         } else if response.contains("Did you already complete it") {
             // We've apparently already solved this in the past, but the cache has no memory of that.
@@ -132,9 +135,6 @@ impl Aocd {
                 _ => panic!("Failed to cache past answers, even though we thought we had solved this puzzle before. BUG!"),
             }
         }
-
-        self.cache
-            .cache_answer_response(part, answer, response, correct);
     }
 
     fn cache_past_answers(&self) -> Result<()> {
