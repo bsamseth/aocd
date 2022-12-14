@@ -33,17 +33,30 @@ fn main() {
 
 You need to provide your AoC session token in order for this crate to get your personal puzzle input and to be able to
 submit answers for you. This is a cookie which is set when you login to AoC. You can find it with your browser
-inspector. See [this issue](https://github.com/wimglenn/advent-of-code/issues/1) for a how-to.
+inspector. See [this issue](https://github.com/wimglenn/advent-of-code/issues/1) for a how-to. You can provide it to
+`aocd` use any of the following alternatives:
 
 ```bash
+# Alt 1 (this way doesn't require any environment variables to be set):
 mkdir -p ~/.config/aocd
 echo "your session cookie here" > ~/.config/aocd/token
+
+# Alt 2:
+export AOC_SESSION="or here"
+
+# Alt 3:
+export AOC_TOKEN="or here"
+
+# Alt 4:
+echo "or here" > some_file
+export AOC_TOKEN_PATH=some_file
 ```
 
 Next, add the crate to your dependencies:
-```
+```bash
 cargo add aocd
 ```
 
 In your code, annotate your main function with `#[aocd(year, day)]`, and then use the macros `input!()` and
-`submit!(part, answer)` to get your puzzle input and submit anawers, respectively.
+`submit!(part, answer)` to get your puzzle input and submit anawers, respectively. See the example above.
+
