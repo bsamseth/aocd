@@ -7,8 +7,11 @@ pub struct Cache {
 }
 
 impl Cache {
-    pub fn new(year: u16, day: u8) -> Self {
-        let directory = shellexpand::tilde("~/.cache/aocd").to_string();
+    pub fn new(year: u16, day: u8, session: &str) -> Self {
+        let directory = std::env::var("AOC_CACHE_DIR")
+            .or_else(|_| std::env::var("XDG_CACHE_HOME"))
+            .unwrap_or_else(|_| shellexpand::tilde("~/.cache/aocd").to_string());
+
         std::fs::create_dir_all(&directory)
             .unwrap_or_else(|_| panic!("Faled to create cache directory: {}", directory));
         let connection = Connection::open(&format!("{}/aocd.sqlite", directory))
