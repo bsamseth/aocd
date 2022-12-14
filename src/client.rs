@@ -181,12 +181,16 @@ impl Aocd {
 }
 
 fn find_aoc_token() -> String {
-    let path = shellexpand::tilde("~/.config/aocd/token");
-    std::fs::read_to_string(path.as_ref())
+    if let Ok(session) = std::env::var("AOC_SESSION").or_else(|_| std::env::var("AOC_TOKEN")) {
+        return session.trim().to_string();
+    }
+
+    let token_path = std::env::var("AOC_TOKEN_PATH")
+        .unwrap_or_else(|_| shellexpand::tilde("~/.config/aocd/token").to_string());
+    std::fs::read_to_string(token_path)
         .unwrap_or_else(|_| {
             panic!(
-                "{} not found. Please add this file with a valid token.",
-                &path
+                "No AoC session token found. See https://crates.io/crates/aocd for how to set it.",
             )
         })
         .trim()
