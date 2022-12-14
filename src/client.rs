@@ -50,7 +50,10 @@ impl Aocd {
             .send()
             .expect("Failed to get input")
             .text()
-            .expect("Failed to parse input");
+            .expect("Failed to parse input")
+            .trim_end_matches("\n")
+            .trim_end_matches("\r")
+            .to_string();
         self.cache.cache_input(&input);
         input
     }
