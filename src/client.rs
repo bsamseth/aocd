@@ -239,32 +239,40 @@ mod tests {
             self.input = Some(input.to_string());
             self
         }
-        fn run<T>(&self, test: impl FnOnce(Aocd) -> Result<T>) -> Result<T> {
-            let dir = tempdir()?;
-            let cache_path = dir.path().join("aocd-cache");
-            std::env::set_var("AOC_SESSION", "testsession");
-            std::env::set_var("AOC_CACHE_DIR", &cache_path);
-            dbg!(&cache_path);
-            let client = Aocd::new(self.year, self.day);
+        fn run<F, T>(&self, test: F) -> Result<T>
+        where
+            T: std::panic::RefUnwindSafe,
+            F: FnOnce(&Aocd) -> Result<T>
+                + std::panic::UnwindSafe
+                + std::panic::RefUnwindSafe
+                + Copy,
+        {
+            let cache_path = std::env::temp_dir().join("aocd-tests");
+            let _ = std::fs::remove_dir_all(&cache_path);
 
-            let result = if let Some(input) = &self.input {
-                let url = format!("{}/{}/day/{}/input", client.url, client.year, client.day);
-                let m = mock("GET", url.as_str())
-                    .with_status(200)
-                    .with_body(input)
-                    .expect(0)
-                    .create();
-                let result = test(client);
-                m.assert();
-                result
-            } else {
-                test(client)
-            };
-
-            // Explicitly drop the cache so that we notice if it doesn't work.
-            drop(cache_path);
-            dir.close()?;
-            result
+            temp_env::with_vars(
+                vec![
+                    ("AOC_SESSION", Some("test-session")),
+                    ("AOC_CACHE_DIR", Some(cache_path.to_str().unwrap())),
+                ],
+                move || {
+                    let client = Aocd::new(self.year, self.day);
+                    if let Some(input) = &self.input {
+                        let url = format!("/{}/day/{}/input", client.year, client.day);
+                        let m = mock("GET", url.as_str())
+                            .with_status(200)
+                            .with_header("content-type", "text/plain")
+                            .with_body(input)
+                            .expect(1)
+                            .create();
+                        let result = test(&client);
+                        m.assert();
+                        result
+                    } else {
+                        test(&client)
+                    }
+                },
+            )
         }
     }
 
@@ -286,18 +294,21 @@ mod tests {
             .input("test input")
             .run(|client| {
                 assert_eq!(client.get_input(), "test input");
+                // A second call will trigger a cache hit. If it doesn't the test will fail because
+                // the mock endpoint only expects a single call.
+                assert_eq!(client.get_input(), "test input");
                 Ok(())
             })
     }
 
     #[test]
     fn test_find_aoc_token_env() {
-        std::env::set_var("AOC_SESSION", "testsession");
-        std::env::set_var("AOC_TOKEN", "testtoken");
-        assert_eq!(find_aoc_token(), "testsession");
-        std::env::remove_var("AOC_SESSION");
-        assert_eq!(find_aoc_token(), "testtoken");
-        std::env::remove_var("AOC_TOKEN");
+        temp_env::with_var("AOC_SESSION", Some("testsession"), || {
+            assert_eq!(find_aoc_token(), "testsession");
+        });
+        temp_env::with_var("AOC_TOKEN", Some("testtoken"), || {
+            assert_eq!(find_aoc_token(), "testtoken");
+        });
     }
 
     #[test]
@@ -307,10 +318,9 @@ mod tests {
         let mut file = File::create(&file_path)?;
         writeln!(file, "testtokenintempfile")?;
 
-        std::env::remove_var("AOC_SESSION");
-        std::env::remove_var("AOC_TOKEN");
-        std::env::set_var("AOC_TOKEN_PATH", &file_path);
-        assert_eq!(find_aoc_token(), "testtokenintempfile");
-        Ok(())
+        temp_env::with_var("AOC_TOKEN_PATH", Some(&file_path), || {
+            assert_eq!(find_aoc_token(), "testtokenintempfile");
+            Ok(())
+        })
     }
 }
