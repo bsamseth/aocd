@@ -302,6 +302,12 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
+    fn test_submit_answer() {
+        todo!()
+    }
+
+    #[test]
     fn test_find_aoc_token_env() {
         temp_env::with_var("AOC_SESSION", Some("testsession"), || {
             assert_eq!(find_aoc_token(), "testsession");
