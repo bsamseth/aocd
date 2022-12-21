@@ -3,6 +3,7 @@ use rusqlite::{Connection, Result};
 pub struct Cache {
     year: u16,
     day: u8,
+    session: String,
     connection: Connection,
 }
 
@@ -14,16 +15,17 @@ impl Cache {
 
         std::fs::create_dir_all(&directory)
             .unwrap_or_else(|_| panic!("Faled to create cache directory: {}", directory));
+
         let connection = Connection::open(&format!("{}/aocd.sqlite", directory))
             .expect("Failed to open cache database");
-
         connection
             .execute(
                 "CREATE TABLE IF NOT EXISTS puzzle_input (
+                   session      TEXT NOT NULL,
                    year         INTEGER NOT NULL,
                    day          INTEGER NOT NULL,
                    input        TEXT NOT NULL,
-                   PRIMARY KEY  (year, day)
+                   PRIMARY KEY  (session, year, day)
                  )",
                 [],
             )
@@ -31,13 +33,14 @@ impl Cache {
         connection
             .execute(
                 "CREATE TABLE IF NOT EXISTS puzzle_answer (
+                   session      TEXT NOT NULL,
                    year         INTEGER NOT NULL,
                    day          INTEGER NOT NULL,
                    part         INTEGER NOT NULL,
                    answer       TEXT NOT NULL,
                    correct      BOOLEAN NOT NULL,
                    response     TEXT NOT NULL,
-                   PRIMARY KEY  (year, day, part, answer)
+                   PRIMARY KEY  (session, year, day, part, answer)
                   )",
                 [],
             )
@@ -46,6 +49,7 @@ impl Cache {
         Self {
             year,
             day,
+            session: session.to_string(),
             connection,
         }
     }
@@ -59,9 +63,10 @@ impl Cache {
     ) {
         self.connection
             .execute(
-                "INSERT OR REPLACE INTO puzzle_answer (year, day, part, answer, correct, response)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                "INSERT OR REPLACE INTO puzzle_answer (session, year, day, part, answer, correct, response)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)",
                 (
+                    &self.session,
                     self.year,
                     self.day,
                     part,
@@ -76,9 +81,13 @@ impl Cache {
     pub fn get_correct_answer(&self, part: u8) -> Result<String> {
         let mut statement = self
             .connection
-            .prepare("SELECT answer FROM puzzle_answer WHERE year = ?1 AND day = ?2 AND part = ?3 AND correct")
+            .prepare(
+                "SELECT answer 
+                 FROM puzzle_answer 
+                 WHERE session = ? AND year = ? AND day = ? AND part = ? AND correct",
+            )
             .expect("Failed to prepare get correct answer statement");
-        let mut rows = statement.query((self.year, self.day, part))?;
+        let mut rows = statement.query((&self.session, self.year, self.day, part))?;
         match rows.next()? {
             Some(row) => Ok(row.get(0)?),
             None => Err(rusqlite::Error::QueryReturnedNoRows),
@@ -91,10 +100,11 @@ impl Cache {
             .prepare(
                 "SELECT response
                  FROM puzzle_answer
-                 WHERE year = ?1 AND day = ?2 AND part = ?3 AND answer = ?4",
+                 WHERE session = ? AND year = ? AND day = ? AND part = ? AND answer = ?",
             )
             .expect("Failed to prepare get_answer_response query");
-        let mut rows = statement.query((self.year, self.day, part, answer.to_string()))?;
+        let mut rows =
+            statement.query((&self.session, self.year, self.day, part, answer.to_string()))?;
         match rows.next()? {
             Some(cached) => Ok(cached.get(0)?),
             _ => Err(rusqlite::Error::QueryReturnedNoRows),
@@ -104,10 +114,10 @@ impl Cache {
     pub fn get_input(&self) -> Result<String> {
         let mut statement = self
             .connection
-            .prepare("SELECT input FROM puzzle_input WHERE year = ? AND day = ?")
+            .prepare("SELECT input FROM puzzle_input WHERE session = ? AND year = ? AND day = ?")
             .expect("Failed to prepare puzzle_input query");
         let row = statement
-            .query_map((self.year, self.day), |row| row.get(0))?
+            .query_map((&self.session, self.year, self.day), |row| row.get(0))?
             .next();
         match row {
             Some(input) => input,
@@ -118,8 +128,8 @@ impl Cache {
     pub fn cache_input(&self, input: &str) {
         self.connection
             .execute(
-                "INSERT OR REPLACE INTO puzzle_input (year, day, input) VALUES (?1, ?2, ?3)",
-                (self.year, self.day, input),
+                "INSERT OR REPLACE INTO puzzle_input (session, year, day, input) VALUES (?, ?, ?, ?)",
+                (&self.session, self.year, self.day, input),
             )
             .expect("Failed to insert puzzle_input into cache");
     }
