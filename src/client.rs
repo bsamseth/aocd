@@ -2,11 +2,10 @@ use crate::cache;
 use anyhow::{anyhow, Result};
 use regex::Regex;
 
-const AOC_URL: &str = "https://adventofcode.com";
-
 pub struct Aocd {
     year: u16,
     day: u8,
+    url: String,
     client: reqwest::blocking::Client,
     cache: cache::Cache,
 }
@@ -27,11 +26,17 @@ impl Aocd {
             .default_headers(headers)
             .build()
             .unwrap();
-        let cache = cache::Cache::new(year, day);
+        let cache = cache::Cache::new(year, day, &session_token);
+
+        #[cfg(not(test))]
+        let url = "https://adventofcode.com".to_string();
+        #[cfg(test)]
+        let url = mockito::server_url().to_string();
 
         Self {
             year,
             day,
+            url,
             client,
             cache,
         }
@@ -46,7 +51,10 @@ impl Aocd {
         }
         let input = self
             .client
-            .get(&format!("{}/{}/day/{}/input", AOC_URL, self.year, self.day))
+            .get(&format!(
+                "{}/{}/day/{}/input",
+                self.url, self.year, self.day
+            ))
             .send()
             .expect("Failed to get input")
             .text()
@@ -85,7 +93,7 @@ impl Aocd {
         }
 
         // Only now do we actually submit the (new) answer.
-        let url = format!("{}/{}/day/{}/answer", AOC_URL, self.year, self.day);
+        let url = format!("{}/{}/day/{}/answer", self.url, self.year, self.day);
         let response = self
             .client
             .post(&url)
@@ -146,7 +154,7 @@ impl Aocd {
             "Caching past answers for {} day {} by parsing the puzzle page.",
             self.year, self.day
         );
-        let url = format!("{}/{}/day/{}/answer", AOC_URL, self.year, self.day);
+        let url = format!("{}/{}/day/{}/answer", self.url, self.year, self.day);
         let response = self.client.get(&url).send()?.error_for_status()?;
         let response_html = response.text()?;
 
@@ -195,4 +203,114 @@ fn find_aoc_token() -> String {
         })
         .trim()
         .to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use mockito::mock;
+    use std::fs::File;
+    use std::io::Write;
+    use tempfile::tempdir;
+
+    struct TestClientBuilder {
+        year: u16,
+        day: u8,
+        input: Option<String>,
+    }
+
+    impl TestClientBuilder {
+        fn new() -> Self {
+            TestClientBuilder {
+                year: 2015,
+                day: 1,
+                input: None,
+            }
+        }
+        fn year(mut self, year: u16) -> Self {
+            self.year = year;
+            self
+        }
+        fn day(mut self, day: u8) -> Self {
+            self.day = day;
+            self
+        }
+        fn input(mut self, input: &str) -> Self {
+            self.input = Some(input.to_string());
+            self
+        }
+        fn run<T>(&self, test: impl FnOnce(Aocd) -> Result<T>) -> Result<T> {
+            let dir = tempdir()?;
+            let cache_path = dir.path().join("aocd-cache");
+            std::env::set_var("AOC_SESSION", "testsession");
+            std::env::set_var("AOC_CACHE_DIR", &cache_path);
+            dbg!(&cache_path);
+            let client = Aocd::new(self.year, self.day);
+
+            let result = if let Some(input) = &self.input {
+                let url = format!("{}/{}/day/{}/input", client.url, client.year, client.day);
+                let m = mock("GET", url.as_str())
+                    .with_status(200)
+                    .with_body(input)
+                    .expect(0)
+                    .create();
+                let result = test(client);
+                m.assert();
+                result
+            } else {
+                test(client)
+            };
+
+            // Explicitly drop the cache so that we notice if it doesn't work.
+            drop(cache_path);
+            dir.close()?;
+            result
+        }
+    }
+
+    #[test]
+    fn test_new_client() -> Result<()> {
+        TestClientBuilder::new().year(2022).day(1).run(|client| {
+            assert_eq!(client.year, 2022);
+            assert_eq!(client.day, 1);
+            assert_eq!(client.url, mockito::server_url().to_string());
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn test_get_input() -> Result<()> {
+        TestClientBuilder::new()
+            .year(2022)
+            .day(1)
+            .input("test input")
+            .run(|client| {
+                assert_eq!(client.get_input(), "test input");
+                Ok(())
+            })
+    }
+
+    #[test]
+    fn test_find_aoc_token_env() {
+        std::env::set_var("AOC_SESSION", "testsession");
+        std::env::set_var("AOC_TOKEN", "testtoken");
+        assert_eq!(find_aoc_token(), "testsession");
+        std::env::remove_var("AOC_SESSION");
+        assert_eq!(find_aoc_token(), "testtoken");
+        std::env::remove_var("AOC_TOKEN");
+    }
+
+    #[test]
+    fn test_find_aoc_token_file() -> Result<()> {
+        let dir = tempdir()?;
+        let file_path = dir.path().join("aocd-token");
+        let mut file = File::create(&file_path)?;
+        writeln!(file, "testtokenintempfile")?;
+
+        std::env::remove_var("AOC_SESSION");
+        std::env::remove_var("AOC_TOKEN");
+        std::env::set_var("AOC_TOKEN_PATH", &file_path);
+        assert_eq!(find_aoc_token(), "testtokenintempfile");
+        Ok(())
+    }
 }
