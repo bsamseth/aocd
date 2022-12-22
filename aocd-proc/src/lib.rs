@@ -29,14 +29,27 @@ impl Parse for ClientArgs {
 }
 
 struct SubmitArgs {
-    part: u8,
+    part: Expr,
     answer: Expr,
 }
 
 impl Parse for SubmitArgs {
     fn parse(input: ParseStream) -> Result<Self> {
-        let part: u8 = input.parse::<LitInt>()?.base10_parse::<u8>()?;
-        assert!(part == 1 || part == 2, "Part should be 1 or 2, no {}", part);
+        let part = input.parse::<Expr>()?;
+
+        // If the expr is a literal integer, give an error if it isn't 1 or 2.
+        if let Expr::Lit(part_lit) = &part {
+            if let syn::Lit::Int(part_int) = &part_lit.lit {
+                if let Ok(part) = part_int.base10_parse::<i64>() {
+                    assert!(
+                        part == 1 || part == 2,
+                        "Part should be 1 or 2, not {}",
+                        part
+                    );
+                }
+            }
+        }
+
         input.parse::<Token![,]>()?;
         let answer: Expr = input.parse()?;
         Ok(SubmitArgs { part, answer })
