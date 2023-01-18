@@ -31,7 +31,7 @@ impl Aocd {
         #[cfg(not(test))]
         let url = "https://adventofcode.com".to_string();
         #[cfg(test)]
-        let url = mockito::server_url().to_string();
+        let url = mockito::server_url();
 
         Self {
             year,
@@ -49,18 +49,16 @@ impl Aocd {
         if let Ok(input) = self.cache.get_input() {
             return input;
         }
+
         let input = self
             .client
-            .get(&format!(
-                "{}/{}/day/{}/input",
-                self.url, self.year, self.day
-            ))
+            .get(format!("{}/{}/day/{}/input", self.url, self.year, self.day))
             .send()
             .expect("Failed to get input")
             .text()
             .expect("Failed to parse input")
-            .trim_end_matches("\n")
-            .trim_end_matches("\r")
+            .trim_end_matches('\n')
+            .trim_end_matches('\r')
             .to_string();
         self.cache.cache_input(&input);
         input
@@ -96,7 +94,7 @@ impl Aocd {
         let url = format!("{}/{}/day/{}/answer", self.url, self.year, self.day);
         let response = self
             .client
-            .post(&url)
+            .post(url)
             .form(&[("level", part.to_string()), ("answer", answer.to_string())])
             .send()
             .expect("Faled to submit answer");
@@ -155,7 +153,7 @@ impl Aocd {
             self.year, self.day
         );
         let url = format!("{}/{}/day/{}/answer", self.url, self.year, self.day);
-        let response = self.client.get(&url).send()?.error_for_status()?;
+        let response = self.client.get(url).send()?.error_for_status()?;
         let response_html = response.text()?;
 
         let mut part1: Option<String> = None;
@@ -172,12 +170,12 @@ impl Aocd {
         let mut found_any = false;
         if let Some(part1) = part1 {
             self.cache
-                .cache_answer_response(1, &part1, "That's the right answer!", true);
+                .cache_answer_response(1, part1, "That's the right answer!", true);
             found_any = true;
         }
         if let Some(part2) = part2 {
             self.cache
-                .cache_answer_response(2, &part2, "That's the right answer!", true);
+                .cache_answer_response(2, part2, "That's the right answer!", true);
             found_any = true;
         }
         if found_any {
@@ -281,7 +279,7 @@ mod tests {
         TestClientBuilder::new().year(2022).day(1).run(|client| {
             assert_eq!(client.year, 2022);
             assert_eq!(client.day, 1);
-            assert_eq!(client.url, mockito::server_url().to_string());
+            assert_eq!(client.url, mockito::server_url());
             Ok(())
         })
     }

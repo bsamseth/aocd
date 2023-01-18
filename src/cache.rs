@@ -16,7 +16,7 @@ impl Cache {
         std::fs::create_dir_all(&directory)
             .unwrap_or_else(|_| panic!("Faled to create cache directory: {}", directory));
 
-        let connection = Connection::open(&format!("{}/aocd.sqlite", directory))
+        let connection = Connection::open(format!("{}/aocd.sqlite", directory))
             .expect("Failed to open cache database");
         connection
             .execute(
