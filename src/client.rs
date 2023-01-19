@@ -15,12 +15,15 @@ impl Aocd {
     ///
     /// Requires a valid session cookie from adventofcode.com to be in a file named `~/.config/aocd/token`
     /// It will also require write access to `~/.cache/aocd` to cache puzzle inputs and answers.
+    ///
+    /// # Panics
+    /// Panics if the session cookie is not found or the cache could not be successfully setup/initialized.
     pub fn new(year: u16, day: u8) -> Self {
         let session_token = find_aoc_token();
         let mut headers = reqwest::header::HeaderMap::new();
         headers.insert(
             reqwest::header::COOKIE,
-            reqwest::header::HeaderValue::from_str(&format!("session={}", session_token)).unwrap(),
+            reqwest::header::HeaderValue::from_str(&format!("session={session_token}")).unwrap(),
         );
         let client = reqwest::blocking::Client::builder()
             .default_headers(headers)
@@ -65,7 +68,10 @@ impl Aocd {
     }
 
     /// Submit an answer to the given year, day, and part.
-    pub fn submit(&self, part: u8, answer: impl ToString) {
+    ///
+    /// # Panics
+    /// Panics if the Advent of Code server responds to the submission with an error.
+    pub fn submit(&self, part: u8, answer: &(impl ToString + ?Sized)) {
         // First check if we have already cached a _correct_ answer for this puzzle.
         if let Ok(correct_answer) = self.cache.get_correct_answer(part) {
             let fill_word = if correct_answer == answer.to_string() {
@@ -125,16 +131,16 @@ impl Aocd {
         let response = response.expect("Failed to parse response from AoC when submitting answer.");
 
         if response.contains("That's the right answer!") {
-            println!("Part {} correctly solved with answer: {}", part, answer);
+            println!("Part {part} correctly solved with answer: {answer}");
             self.cache
                 .cache_answer_response(part, answer, response, true);
         } else if response.contains("That's not the right answer") {
-            println!("{}", response);
+            println!("{response}");
             self.cache
                 .cache_answer_response(part, answer, response, false);
         } else if response.contains("You gave an answer too recently") {
             // Don't cache this response.
-            println!("{}", response);
+            println!("{response}");
         } else if response.contains("Did you already complete it") {
             // We've apparently already solved this in the past, but the cache has no memory of that.
             // In this case we look up what we've solved in the past, and cache it.
@@ -166,16 +172,16 @@ impl Aocd {
                 part2 = Some(capture[1].to_string());
             }
         }
-        println!("Found past answers: {:?} {:?}", part1, part2);
+        println!("Found past answers: {part1:?} {part2:?}");
         let mut found_any = false;
         if let Some(part1) = part1 {
             self.cache
-                .cache_answer_response(1, part1, "That's the right answer!", true);
+                .cache_answer_response(1, &part1, "That's the right answer!", true);
             found_any = true;
         }
         if let Some(part2) = part2 {
             self.cache
-                .cache_answer_response(2, part2, "That's the right answer!", true);
+                .cache_answer_response(2, &part2, "That's the right answer!", true);
             found_any = true;
         }
         if found_any {
@@ -246,7 +252,7 @@ mod tests {
                 + Copy,
         {
             let cache_path = std::env::temp_dir().join("aocd-tests");
-            let _ = std::fs::remove_dir_all(&cache_path);
+            let _ignore = std::fs::remove_dir_all(&cache_path);
 
             temp_env::with_vars(
                 vec![

@@ -14,9 +14,9 @@ impl Cache {
             .unwrap_or_else(|_| shellexpand::tilde("~/.cache/aocd").to_string());
 
         std::fs::create_dir_all(&directory)
-            .unwrap_or_else(|_| panic!("Faled to create cache directory: {}", directory));
+            .unwrap_or_else(|_| panic!("Faled to create cache directory: {directory}"));
 
-        let connection = Connection::open(format!("{}/aocd.sqlite", directory))
+        let connection = Connection::open(format!("{directory}/aocd.sqlite"))
             .expect("Failed to open cache database");
         connection
             .execute(
@@ -57,7 +57,7 @@ impl Cache {
     pub fn cache_answer_response(
         &self,
         part: u8,
-        answer: impl ToString,
+        answer: &(impl ToString + ?Sized),
         response: &str,
         correct: bool,
     ) {

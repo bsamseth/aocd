@@ -70,6 +70,9 @@ impl Parse for SubmitArgs {
 ///    submit!(1, part_1_answer);
 /// }
 /// ```
+///
+/// # Panics
+/// Panics (i.e. surfaces a compile error) if the arguments are not two integers in the expected ranges.
 #[proc_macro_attribute]
 pub fn aocd(attr: TokenStream, input: TokenStream) -> TokenStream {
     let args = parse_macro_input!(attr as ClientArgs);
