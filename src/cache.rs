@@ -54,13 +54,7 @@ impl Cache {
         }
     }
 
-    pub fn cache_answer_response(
-        &self,
-        part: u8,
-        answer: &(impl ToString + ?Sized),
-        response: &str,
-        correct: bool,
-    ) {
+    pub fn cache_answer_response(&self, part: u8, answer: &str, response: &str, correct: bool) {
         self.connection
             .execute(
                 "INSERT OR REPLACE INTO puzzle_answer (session, year, day, part, answer, correct, response)
@@ -70,7 +64,7 @@ impl Cache {
                     self.year,
                     self.day,
                     part,
-                    answer.to_string(),
+                    answer,
                     correct,
                     response,
                 ),

@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::cache;
 use anyhow::{anyhow, Result};
 use regex::Regex;
@@ -71,10 +73,11 @@ impl Aocd {
     ///
     /// # Panics
     /// Panics if the Advent of Code server responds to the submission with an error.
-    pub fn submit(&self, part: u8, answer: &(impl ToString + ?Sized)) {
+    pub fn submit(&self, part: u8, answer: impl Display) {
+        let answer = answer.to_string();
         // First check if we have already cached a _correct_ answer for this puzzle.
         if let Ok(correct_answer) = self.cache.get_correct_answer(part) {
-            let fill_word = if correct_answer == answer.to_string() {
+            let fill_word = if correct_answer == answer {
                 "the same"
             } else {
                 "a different"
@@ -87,12 +90,8 @@ impl Aocd {
         }
 
         // Now check if we have already checked this particular answer before. If so we know it is wrong.
-        if let Ok(response) = self.cache.get_answer_response(part, &answer.to_string()) {
-            println!(
-                "You've already incorrectly guessed {}, and the server responed with:\n{}",
-                answer.to_string(),
-                response
-            );
+        if let Ok(response) = self.cache.get_answer_response(part, &answer) {
+            println!( "You've already incorrectly guessed {answer}, and the server responed with:\n{response}");
             return;
         }
 
@@ -113,7 +112,7 @@ impl Aocd {
             .text()
             .expect("Falied to read response from AoC after posting answer.");
 
-        self.handle_answer_response(part, &answer.to_string(), &response_html);
+        self.handle_answer_response(part, &answer, &response_html);
     }
 
     fn handle_answer_response(&self, part: u8, answer: &str, html: &str) {
