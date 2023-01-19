@@ -83,7 +83,7 @@ pub fn aocd(attr: TokenStream, input: TokenStream) -> TokenStream {
         year
     );
     assert!(
-        day >= 1 && day <= 25,
+        (1..=25).contains(&day),
         "Chose a day from 1 to 25, not {}.",
         day
     );
