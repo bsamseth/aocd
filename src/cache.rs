@@ -1,130 +1,96 @@
-use rusqlite::{Connection, Result};
+use anyhow::Result;
+use std::{
+    fs::File,
+    io::{Read, Write},
+};
 
 pub struct Cache {
     year: u16,
     day: u8,
-    session: String,
-    connection: Connection,
+    cache_directory: String,
 }
 
 impl Cache {
-    pub fn new(year: u16, day: u8, session: &str) -> Self {
+    pub fn new(year: u16, day: u8, session: &str) -> Result<Self> {
         let directory = std::env::var("AOC_CACHE_DIR")
             .or_else(|_| std::env::var("XDG_CACHE_HOME"))
             .unwrap_or_else(|_| shellexpand::tilde("~/.cache/aocd").to_string());
+        let directory = format!("{directory}/{session}");
 
-        std::fs::create_dir_all(&directory)
-            .unwrap_or_else(|_| panic!("Faled to create cache directory: {directory}"));
+        let inputs_directory = format!("{directory}/inputs");
+        let answers_directory = format!("{directory}/answers");
 
-        let connection = Connection::open(format!("{directory}/aocd.sqlite"))
-            .expect("Failed to open cache database");
-        connection
-            .execute(
-                "CREATE TABLE IF NOT EXISTS puzzle_input (
-                   session      TEXT NOT NULL,
-                   year         INTEGER NOT NULL,
-                   day          INTEGER NOT NULL,
-                   input        TEXT NOT NULL,
-                   PRIMARY KEY  (session, year, day)
-                 )",
-                [],
-            )
-            .expect("Failed to create puzzle_input cache table");
-        connection
-            .execute(
-                "CREATE TABLE IF NOT EXISTS puzzle_answer (
-                   session      TEXT NOT NULL,
-                   year         INTEGER NOT NULL,
-                   day          INTEGER NOT NULL,
-                   part         INTEGER NOT NULL,
-                   answer       TEXT NOT NULL,
-                   correct      BOOLEAN NOT NULL,
-                   response     TEXT NOT NULL,
-                   PRIMARY KEY  (session, year, day, part, answer)
-                  )",
-                [],
-            )
-            .expect("Failed to create puzzle_answer cache table");
+        std::fs::create_dir_all(inputs_directory)?;
+        std::fs::create_dir_all(answers_directory)?;
 
-        Self {
+        Ok(Self {
             year,
             day,
-            session: session.to_string(),
-            connection,
-        }
+            cache_directory: directory,
+        })
     }
 
-    pub fn cache_answer_response(&self, part: u8, answer: &str, response: &str, correct: bool) {
-        self.connection
-            .execute(
-                "INSERT OR REPLACE INTO puzzle_answer (session, year, day, part, answer, correct, response)
-                 VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (
-                    &self.session,
-                    self.year,
-                    self.day,
-                    part,
-                    answer,
-                    correct,
-                    response,
-                ),
-            )
-            .expect("Failed to cache puzzle answer response");
+    fn answer_cache_file_prefix(&self, part: u8) -> String {
+        format!(
+            "{directory}/answers/{year}-{day:02}-{part}",
+            directory = self.cache_directory,
+            year = self.year,
+            day = self.day,
+            part = part
+        )
+    }
+
+    fn input_cache_file(&self) -> String {
+        format!(
+            "{directory}/inputs/{year}-{day:02}",
+            directory = self.cache_directory,
+            year = self.year,
+            day = self.day
+        )
+    }
+
+    pub fn cache_answer_response(
+        &self,
+        part: u8,
+        answer: &str,
+        response: &str,
+        correct: bool,
+    ) -> Result<()> {
+        let prefix = self.answer_cache_file_prefix(part);
+        File::create(format!("{prefix}-resp-{answer}"))?.write_all(response.as_bytes())?;
+        if correct {
+            File::create(format!("{prefix}-correct"))?.write_all(answer.as_bytes())?;
+        }
+
+        Ok(())
     }
 
     pub fn get_correct_answer(&self, part: u8) -> Result<String> {
-        let mut statement = self
-            .connection
-            .prepare(
-                "SELECT answer 
-                 FROM puzzle_answer 
-                 WHERE session = ? AND year = ? AND day = ? AND part = ? AND correct",
-            )
-            .expect("Failed to prepare get correct answer statement");
-        let mut rows = statement.query((&self.session, self.year, self.day, part))?;
-        match rows.next()? {
-            Some(row) => Ok(row.get(0)?),
-            None => Err(rusqlite::Error::QueryReturnedNoRows),
-        }
+        let prefix = self.answer_cache_file_prefix(part);
+        let mut file = File::open(format!("{prefix}-correct"))?;
+        let mut answer = String::new();
+        file.read_to_string(&mut answer)?;
+        Ok(answer)
     }
 
     pub fn get_answer_response(&self, part: u8, answer: &str) -> Result<String> {
-        let mut statement = self
-            .connection
-            .prepare(
-                "SELECT response
-                 FROM puzzle_answer
-                 WHERE session = ? AND year = ? AND day = ? AND part = ? AND answer = ?",
-            )
-            .expect("Failed to prepare get_answer_response query");
-        let mut rows =
-            statement.query((&self.session, self.year, self.day, part, answer.to_string()))?;
-        match rows.next()? {
-            Some(cached) => Ok(cached.get(0)?),
-            _ => Err(rusqlite::Error::QueryReturnedNoRows),
-        }
+        let prefix = self.answer_cache_file_prefix(part);
+        let mut file = File::open(format!("{prefix}-resp-{answer}"))?;
+        let mut response = String::new();
+        file.read_to_string(&mut response)?;
+        Ok(response)
     }
 
     pub fn get_input(&self) -> Result<String> {
-        let mut statement = self
-            .connection
-            .prepare("SELECT input FROM puzzle_input WHERE session = ? AND year = ? AND day = ?")
-            .expect("Failed to prepare puzzle_input query");
-        let row = statement
-            .query_map((&self.session, self.year, self.day), |row| row.get(0))?
-            .next();
-        match row {
-            Some(input) => input,
-            None => Err(rusqlite::Error::QueryReturnedNoRows),
-        }
+        let mut file = File::open(self.input_cache_file())?;
+        let mut input = String::new();
+        file.read_to_string(&mut input)?;
+        Ok(input)
     }
 
-    pub fn cache_input(&self, input: &str) {
-        self.connection
-            .execute(
-                "INSERT OR REPLACE INTO puzzle_input (session, year, day, input) VALUES (?, ?, ?, ?)",
-                (&self.session, self.year, self.day, input),
-            )
-            .expect("Failed to insert puzzle_input into cache");
+    pub fn cache_input(&self, input: &str) -> Result<()> {
+        let mut file = File::create(self.input_cache_file())?;
+        file.write_all(input.as_bytes())?;
+        Ok(())
     }
 }
