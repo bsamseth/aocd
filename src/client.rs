@@ -12,11 +12,6 @@ pub struct Aocd {
     cache: cache::Cache,
 }
 
-// headers.insert(
-//     reqwest::header::COOKIE,
-//     reqwest::header::HeaderValue::from_str(&format!("session={session_token}")).unwrap(),
-// );
-
 impl Aocd {
     /// Create a new Aocd client.
     ///
@@ -58,7 +53,8 @@ impl Aocd {
         }
 
         let input = minreq::get(format!("{}/{}/day/{}/input", self.url, self.year, self.day))
-            .with_header("cookie", format!("session={}", self.session_token))
+            .with_header("Cookie", format!("session={}", self.session_token))
+            .with_header("Content-Type", "text/plain")
             .send()
             .expect("Failed to get input")
             .as_str()
@@ -161,7 +157,8 @@ impl Aocd {
         );
         let url = format!("{}/{}/day/{}/answer", self.url, self.year, self.day);
         let response = minreq::get(url)
-            .with_header("cookie", format!("session={}", self.session_token))
+            .with_header("Cookie", format!("session={}", self.session_token))
+            .with_header("Content-Type", "text/plain")
             .send()?;
         if response.status_code != 200 {
             return Err(anyhow!(
@@ -273,7 +270,7 @@ mod tests {
                         let url = format!("/{}/day/{}/input", client.year, client.day);
                         let m = mock("GET", url.as_str())
                             .with_status(200)
-                            .with_header("content-type", "text/plain")
+                            .with_header("Content-Type", "text/plain")
                             .with_body(input)
                             .expect(1)
                             .create();
