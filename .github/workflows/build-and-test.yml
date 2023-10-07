@@ -21,6 +21,6 @@ jobs:
     - name: Build aocd
       run: cargo build
     - name: Run tests for aocd-proc
-      run: cd aocd-proc && cargo test
+      run: cd aocd-proc && RUST_BACKTRACE=1 cargo test
     - name: Run tests for aocd
-      run: cargo test
+      run: RUST_BACKTRACE=1 cargo test
