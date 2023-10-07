@@ -1,8 +1,4 @@
 use anyhow::Result;
-use std::{
-    fs::File,
-    io::{Read, Write},
-};
 
 pub struct Cache {
     year: u16,
@@ -57,9 +53,9 @@ impl Cache {
         correct: bool,
     ) -> Result<()> {
         let prefix = self.answer_cache_file_prefix(part);
-        File::create(format!("{prefix}-resp-{answer}"))?.write_all(response.as_bytes())?;
+        std::fs::write(format!("{prefix}-resp-{answer}"), response)?;
         if correct {
-            File::create(format!("{prefix}-correct"))?.write_all(answer.as_bytes())?;
+            std::fs::write(format!("{prefix}-correct"), answer)?;
         }
 
         Ok(())
@@ -67,30 +63,23 @@ impl Cache {
 
     pub fn get_correct_answer(&self, part: u8) -> Result<String> {
         let prefix = self.answer_cache_file_prefix(part);
-        let mut file = File::open(format!("{prefix}-correct"))?;
-        let mut answer = String::new();
-        file.read_to_string(&mut answer)?;
+        let answer = std::fs::read_to_string(format!("{prefix}-correct"))?;
         Ok(answer)
     }
 
     pub fn get_answer_response(&self, part: u8, answer: &str) -> Result<String> {
         let prefix = self.answer_cache_file_prefix(part);
-        let mut file = File::open(format!("{prefix}-resp-{answer}"))?;
-        let mut response = String::new();
-        file.read_to_string(&mut response)?;
+        let response = std::fs::read_to_string(format!("{prefix}-resp-{answer}"))?;
         Ok(response)
     }
 
     pub fn get_input(&self) -> Result<String> {
-        let mut file = File::open(self.input_cache_file())?;
-        let mut input = String::new();
-        file.read_to_string(&mut input)?;
+        let input = std::fs::read_to_string(self.input_cache_file())?;
         Ok(input)
     }
 
     pub fn cache_input(&self, input: &str) -> Result<()> {
-        let mut file = File::create(self.input_cache_file())?;
-        file.write_all(input.as_bytes())?;
+        std::fs::write(self.input_cache_file(), input)?;
         Ok(())
     }
 }
