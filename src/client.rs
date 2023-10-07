@@ -8,9 +8,14 @@ pub struct Aocd {
     year: u16,
     day: u8,
     url: String,
-    client: reqwest::blocking::Client,
+    session_token: String,
     cache: cache::Cache,
 }
+
+// headers.insert(
+//     reqwest::header::COOKIE,
+//     reqwest::header::HeaderValue::from_str(&format!("session={session_token}")).unwrap(),
+// );
 
 impl Aocd {
     /// Create a new Aocd client.
@@ -20,18 +25,11 @@ impl Aocd {
     ///
     /// # Panics
     /// Panics if the session cookie is not found or the cache could not be successfully setup/initialized.
+    #[must_use]
     pub fn new(year: u16, day: u8) -> Self {
         let session_token = find_aoc_token();
-        let mut headers = reqwest::header::HeaderMap::new();
-        headers.insert(
-            reqwest::header::COOKIE,
-            reqwest::header::HeaderValue::from_str(&format!("session={session_token}")).unwrap(),
-        );
-        let client = reqwest::blocking::Client::builder()
-            .default_headers(headers)
-            .build()
-            .unwrap();
-        let cache = cache::Cache::new(year, day, &session_token);
+        let cache = cache::Cache::new(year, day, &session_token)
+            .expect("Should be able to create cache for aocd");
 
         #[cfg(not(test))]
         let url = "https://adventofcode.com".to_string();
@@ -42,7 +40,7 @@ impl Aocd {
             year,
             day,
             url,
-            client,
+            session_token,
             cache,
         }
     }
@@ -50,22 +48,27 @@ impl Aocd {
     /// Get the puzzle input for the given year and day.
     ///
     /// If possible this will fetch from a local cache, and only fall back to the server if necessary.
+    ///
+    /// # Panics
+    /// Panics if the Advent of Code server responds with an error.
+    #[must_use]
     pub fn get_input(&self) -> String {
         if let Ok(input) = self.cache.get_input() {
             return input;
         }
 
-        let input = self
-            .client
-            .get(format!("{}/{}/day/{}/input", self.url, self.year, self.day))
+        let input = minreq::get(format!("{}/{}/day/{}/input", self.url, self.year, self.day))
+            .with_header("cookie", format!("session={}", self.session_token))
             .send()
             .expect("Failed to get input")
-            .text()
-            .expect("Failed to parse input")
+            .as_str()
+            .expect("Failed to parse input as string")
             .trim_end_matches('\n')
             .trim_end_matches('\r')
             .to_string();
-        self.cache.cache_input(&input);
+        self.cache
+            .cache_input(&input)
+            .expect("Should be able to cache input");
         input
     }
 
@@ -82,10 +85,7 @@ impl Aocd {
             } else {
                 "a different"
             };
-            println!(
-                "Part {} already solved with {} answer: {}",
-                part, fill_word, correct_answer
-            );
+            println!("Part {part} already solved with {fill_word} answer: {correct_answer}");
             return;
         }
 
@@ -97,25 +97,26 @@ impl Aocd {
 
         // Only now do we actually submit the (new) answer.
         let url = format!("{}/{}/day/{}/answer", self.url, self.year, self.day);
-        let response = self
-            .client
-            .post(url)
-            .form(&[("level", part.to_string()), ("answer", answer.to_string())])
-            .send()
-            .expect("Faled to submit answer");
+        let formdata = format!("level={}&answer={}", part, urlencoding::encode(&answer));
+        let r = minreq::post(url)
+            .with_header("Cookie", format!("session={}", self.session_token))
+            .with_header("Content-Type", "application/x-www-form-urlencoded")
+            .with_body(formdata);
+        let response = r.send().expect("Faled to submit answer");
 
         assert!(
-            response.status().is_success(),
+            response.status_code == 200,
             "Non 200 response from AoC when posting answer. Failed to submit answer. Check your token."
         );
         let response_html = response
-            .text()
+            .as_str()
             .expect("Falied to read response from AoC after posting answer.");
 
-        self.handle_answer_response(part, &answer, &response_html);
+        self.handle_answer_response(part, &answer, response_html)
+            .expect("Failed to handle response from AoC");
     }
 
-    fn handle_answer_response(&self, part: u8, answer: &str, html: &str) {
+    fn handle_answer_response(&self, part: u8, answer: &str, html: &str) -> Result<()> {
         let mut response = None;
         for line in html.lines() {
             if line.starts_with("<article>") {
@@ -132,11 +133,11 @@ impl Aocd {
         if response.contains("That's the right answer!") {
             println!("Part {part} correctly solved with answer: {answer}");
             self.cache
-                .cache_answer_response(part, answer, response, true);
+                .cache_answer_response(part, answer, response, true)?;
         } else if response.contains("That's not the right answer") {
             println!("{response}");
             self.cache
-                .cache_answer_response(part, answer, response, false);
+                .cache_answer_response(part, answer, response, false)?;
         } else if response.contains("You gave an answer too recently") {
             // Don't cache this response.
             println!("{response}");
@@ -145,10 +146,11 @@ impl Aocd {
             // In this case we look up what we've solved in the past, and cache it.
             // Then we can restart the submit flow entirely, and it should not hit this case again.
             match self.cache_past_answers() {
-                Ok(()) => return self.submit(part, answer),
+                Ok(()) => self.submit(part, answer),
                 _ => panic!("Failed to cache past answers, even though we thought we had solved this puzzle before. BUG!"),
             }
         }
+        Ok(())
     }
 
     fn cache_past_answers(&self) -> Result<()> {
@@ -158,13 +160,20 @@ impl Aocd {
             self.year, self.day
         );
         let url = format!("{}/{}/day/{}/answer", self.url, self.year, self.day);
-        let response = self.client.get(url).send()?.error_for_status()?;
-        let response_html = response.text()?;
+        let response = minreq::get(url)
+            .with_header("cookie", format!("session={}", self.session_token))
+            .send()?;
+        if response.status_code != 200 {
+            return Err(anyhow!(
+                "Non 200 response from AoC when getting puzzle page. Failed to cache past answers. Check your token."
+            ));
+        }
+        let response_html = response.as_str()?;
 
         let mut part1: Option<String> = None;
         let mut part2: Option<String> = None;
         let re = Regex::new(r#"Your puzzle answer was <code>(.*?)</code>"#).unwrap();
-        for capture in re.captures_iter(&response_html) {
+        for capture in re.captures_iter(response_html) {
             if part1.is_none() {
                 part1 = Some(capture[1].to_string());
             } else {
@@ -175,12 +184,12 @@ impl Aocd {
         let mut found_any = false;
         if let Some(part1) = part1 {
             self.cache
-                .cache_answer_response(1, &part1, "That's the right answer!", true);
+                .cache_answer_response(1, &part1, "That's the right answer!", true)?;
             found_any = true;
         }
         if let Some(part2) = part2 {
             self.cache
-                .cache_answer_response(2, &part2, "That's the right answer!", true);
+                .cache_answer_response(2, &part2, "That's the right answer!", true)?;
             found_any = true;
         }
         if found_any {
