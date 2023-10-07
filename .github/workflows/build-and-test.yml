@@ -16,11 +16,14 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+    - uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
     - name: Build aocd-proc
       run: cd aocd-proc && cargo build
     - name: Build aocd
       run: cargo build
     - name: Run tests for aocd-proc
-      run: cd aocd-proc && RUST_BACKTRACE=1 cargo test
+      run: cd aocd-proc && RUST_BACKTRACE=1 cargo test -- --test-threads=1
     - name: Run tests for aocd
-      run: RUST_BACKTRACE=1 cargo test
+      run: RUST_BACKTRACE=1 cargo test -- --test-threads=1
