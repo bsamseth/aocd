@@ -79,7 +79,6 @@ impl Cache {
     }
 
     pub fn cache_input(&self, input: &str) -> Result<()> {
-        dbg!(self.input_cache_file());
         std::fs::write(self.input_cache_file(), input)?;
         Ok(())
     }
