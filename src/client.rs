@@ -76,18 +76,17 @@ impl Aocd {
         let answer = answer.to_string();
         // First check if we have already cached a _correct_ answer for this puzzle.
         if let Ok(correct_answer) = self.cache.get_correct_answer(part) {
-            let fill_word = if correct_answer == answer {
-                "the same"
+            if correct_answer == answer {
+                println!("⭐ Part {part} already solved with the same answer: {correct_answer} ⭐");
             } else {
-                "a different"
-            };
-            println!("Part {part} already solved with {fill_word} answer: {correct_answer}");
+                println!("❌ Part {part} already solved with a different answer: {correct_answer} (you submitted: {answer}) ❌");
+            }
             return;
         }
 
         // Now check if we have already checked this particular answer before. If so we know it is wrong.
         if let Ok(response) = self.cache.get_answer_response(part, &answer) {
-            println!( "You've already incorrectly guessed {answer}, and the server responed with:\n{response}");
+            println!( "❌ You've already incorrectly guessed {answer}, and the server responed with: ❌ \n{response}");
             return;
         }
 
@@ -127,16 +126,16 @@ impl Aocd {
         let response = response.expect("Failed to parse response from AoC when submitting answer.");
 
         if response.contains("That's the right answer!") {
-            println!("Part {part} correctly solved with answer: {answer}");
+            println!("🌟 Part {part} correctly solved with answer: {answer} 🌟");
             self.cache
                 .cache_answer_response(part, answer, response, true)?;
         } else if response.contains("That's not the right answer") {
-            println!("{response}");
+            println!("❌ {response}");
             self.cache
                 .cache_answer_response(part, answer, response, false)?;
         } else if response.contains("You gave an answer too recently") {
             // Don't cache this response.
-            println!("{response}");
+            println!("❌ {response}");
         } else if response.contains("Did you already complete it") {
             // We've apparently already solved this in the past, but the cache has no memory of that.
             // In this case we look up what we've solved in the past, and cache it.
