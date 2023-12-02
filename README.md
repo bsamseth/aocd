@@ -13,7 +13,7 @@ yes, this too tries to cache everything it gets from Advent of Code to spare the
 
 **Spoiler**: This example does in fact solve one of the AoC puzzles.
 
-```rust
+```rust ignore
 use aocd::*;
 // or, if you prefer: use aocd::prelude::*;
 
@@ -35,7 +35,7 @@ fn main() {
 If you want to use a smaller test input while debugging, this can be done by just adding the file name at the top.
 In this case, the `input!` macro simply reads the file, and `submit!` just prints the result without submitting to AoC.
 
-```rust
+```rust ignore
 use aocd::*;
 
 #[aocd(2022, 1, "test.txt")]
