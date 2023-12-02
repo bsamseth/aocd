@@ -10,6 +10,7 @@ pub struct Aocd {
     url: String,
     session_token: String,
     cache: cache::Cache,
+    test_file: Option<String>,
 }
 
 impl Aocd {
@@ -18,10 +19,21 @@ impl Aocd {
     /// Requires a valid session cookie from adventofcode.com to be in a file named `~/.config/aocd/token`
     /// It will also require write access to `~/.cache/aocd` to cache puzzle inputs and answers.
     ///
+    /// Alternatively, if a test file is provided, the client will just be a thin wrapper using the
+    /// file as input and simply printing answers to stdout.
+    ///
+    /// # Examples
+    /// ```
+    /// use aocd::Aocd;
+    ///
+    /// let client = Aocd::new(2020, 1, None);
+    /// let test_client = Aocd::new(2020, 1, Some("test_input.txt"));
+    /// ```
+    ///
     /// # Panics
     /// Panics if the session cookie is not found or the cache could not be successfully setup/initialized.
     #[must_use]
-    pub fn new(year: u16, day: u8) -> Self {
+    pub fn new(year: u16, day: u8, test_file: Option<&str>) -> Self {
         let session_token = find_aoc_token();
         let cache = cache::Cache::new(year, day, &session_token)
             .expect("Should be able to create cache for aocd");
@@ -37,6 +49,7 @@ impl Aocd {
             url,
             session_token,
             cache,
+            test_file: test_file.map(|s| s.to_string()),
         }
     }
 
@@ -48,6 +61,14 @@ impl Aocd {
     /// Panics if the Advent of Code server responds with an error.
     #[must_use]
     pub fn get_input(&self) -> String {
+        if let Some(test_file) = &self.test_file {
+            return std::fs::read_to_string(test_file)
+                .expect("Failed to read test file")
+                .trim_end_matches('\n')
+                .trim_end_matches('\r')
+                .to_string();
+        }
+
         if let Ok(input) = self.cache.get_input() {
             return input;
         }
@@ -74,6 +95,12 @@ impl Aocd {
     /// Panics if the Advent of Code server responds to the submission with an error.
     pub fn submit(&self, part: u8, answer: impl Display) {
         let answer = answer.to_string();
+
+        if self.test_file.is_some() {
+            println!("🕵️ Part {part} test result: {answer} 🕵️");
+            return;
+        }
+
         // First check if we have already cached a _correct_ answer for this puzzle.
         if let Ok(correct_answer) = self.cache.get_correct_answer(part) {
             if correct_answer == answer {
@@ -264,7 +291,7 @@ mod tests {
                     ("AOC_CACHE_DIR", Some(cache_path.to_str().unwrap())),
                 ],
                 move || {
-                    let client = Aocd::new(self.year, self.day);
+                    let client = Aocd::new(self.year, self.day, None);
                     if let Some(input) = &self.input {
                         let url = format!("/{}/day/{}/input", client.year, client.day);
                         let m = mock("GET", url.as_str())

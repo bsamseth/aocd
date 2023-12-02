@@ -15,6 +15,7 @@ yes, this too tries to cache everything it gets from Advent of Code to spare the
 
 ```rust
 use aocd::*;
+// or, if you prefer: use aocd::prelude::*;
 
 #[aocd(2022, 1)]
 fn main() {
@@ -29,6 +30,21 @@ fn main() {
 }
 ```
 
+### Testing
+
+If you want to use a smaller test input while debugging, this can be done by just adding the file name at the top.
+In this case, the `input!` macro simply reads the file, and `submit!` just prints the result without submitting to AoC.
+
+```rust
+use aocd::*;
+
+#[aocd(2022, 1, "test.txt")]
+fn main() {
+    ...
+}
+```
+
+
 ## Quickstart
 
 You need to provide your AoC session token in order for this crate to get your personal puzzle input and to be able to
@@ -36,7 +52,7 @@ submit answers for you. This is a cookie which is set when you login to AoC. You
 inspector. See [this issue](https://github.com/wimglenn/advent-of-code/issues/1) for a how-to. You can provide it to
 `aocd` using any of the following alternatives:
 
-```bash
+``` bash
 # Alt 1 (this way doesn't require any environment variables to be set):
 mkdir -p ~/.config/aocd
 echo "your session cookie here" > ~/.config/aocd/token
